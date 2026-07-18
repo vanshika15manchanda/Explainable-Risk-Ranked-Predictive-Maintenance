@@ -359,3 +359,37 @@ print(f"Shape of y_binary: {y_binary.shape}")
 print('\n--- Failure Type Targets (y_multi) ---')
 display(y_multi.head())
 print(f"Shape of y_multi: {y_multi.shape}")
+
+
+print('--- STEP 5: SPLIT THE DATA ---')
+
+from sklearn.model_selection import train_test_split
+
+# Splitting into training and testing sets (80% train, 20% test) for binary y
+print("Splitting data into training and testing sets (80/20 split) with stratification...")
+X_bi_train, X_bi_test, y_bi_train, y_bi_test = train_test_split(X, y_binary, test_size=0.2, random_state=42, stratify=y_binary)
+
+
+# Verifying the shapes of the split datasets
+print(f"\nShape of X_train: {X_bi_train.shape}")
+print(f"Shape of y_train: {y_bi_train.shape}")
+print(f"Shape of X_test: {X_bi_test.shape}")
+print(f"Shape of y_test: {y_bi_test.shape}")
+
+
+print("\nClass distribution in y_train:")
+print(y_bi_train.value_counts(normalize=True).round(4))
+print("\nClass distribution in y_test:")
+print(y_bi_test.value_counts(normalize=True).round(4))
+
+#Step 5b , Spilting for y_multi
+print('STEP 5b: ALIGN y_multi TO THE SAME SPLIT')
+
+y_multi_train = y_multi.loc[X_bi_train.index]
+y_multi_test = y_multi.loc[X_bi_test.index]
+
+assert (X_bi_train.index == y_multi_train.index).all()
+assert (X_bi_test.index == y_multi_test.index).all()
+print("y_multi aligned to Stage 1 split.")
+print(f"y_multi_train shape: {y_multi_train.shape}")
+print(f"y_multi_test shape: {y_multi_test.shape}")
