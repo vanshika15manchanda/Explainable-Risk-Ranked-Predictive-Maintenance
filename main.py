@@ -323,3 +323,39 @@ def run_eda(df):
     plot_scatter_relationships(df)
     plot_product_type_failure(df)
 
+print('--- STEP 4: PREPARE FEATURES & TARGET ---')
+
+# 1. Encode the Categorical Column ('Type')
+# We'll use pandas get_dummies for one-hot encoding.
+# drop_first=True prevents the "dummy variable trap" by dropping one of the categories.
+# dtype=int ensures the output is 0 and 1 instead of True and False.
+print("\nEncoding the 'Type' column (L, M, H)...")
+df_encoded = pd.get_dummies(df, columns=['Type'], drop_first=True, dtype=int)
+print("Columns after one-hot encoding:\n", df_encoded.columns.tolist())
+
+# 2. Define the Targets (y)
+print("\nSeparating targets from features...")
+# Binary target for initial modeling
+y_binary = df_encoded['Machine failure']
+
+# Multiclass/Multi-label targets for later experimentation
+failure_types = ['TWF', 'HDF', 'PWF', 'OSF', 'RNF']
+y_multi = df_encoded[failure_types]
+
+# 3. Define the Features (X)
+
+columns_to_drop = ['Machine failure'] + failure_types
+X = df_encoded.drop(columns=columns_to_drop)
+
+# 4. Verify the Splits
+print('\n--- Feature Set (X) ---')
+display(X.head())
+print(f"Shape of X: {X.shape}")
+
+print('\n--- Binary Target (y_binary) ---')
+display(y_binary.head().to_frame())
+print(f"Shape of y_binary: {y_binary.shape}")
+
+print('\n--- Failure Type Targets (y_multi) ---')
+display(y_multi.head())
+print(f"Shape of y_multi: {y_multi.shape}")
