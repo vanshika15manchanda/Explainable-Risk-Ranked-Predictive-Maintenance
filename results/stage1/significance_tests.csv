@@ -1,0 +1,3 @@
+Baseline,Comparison,t_statistic,p_value
+scale_pos_weight,No Rebalancing,0.6151896215644478,0.5717051065503176
+scale_pos_weight,SMOTE,1.2677158219641633,0.2736710035354027

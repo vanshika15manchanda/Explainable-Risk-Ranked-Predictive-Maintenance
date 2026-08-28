@@ -1,0 +1,2 @@
+Model,Task,Best CV F1,Test Accuracy,Test Precision,Test Recall,Test F1,Test ROC-AUC,Best Parameters
+XGBoost,Stage 1 Binary Failure Detection,0.7565288315758127,0.9845,0.7761194029850746,0.7647058823529411,0.7703703703703704,0.9672999634636463,"{'learning_rate': 0.2, 'max_depth': 7, 'n_estimators': 200, 'scale_pos_weight': np.float64(14.260147601476016)}"
