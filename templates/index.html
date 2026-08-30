@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inspection Deck</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="font-body">
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- HEADER -->
+  <header class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div class="flex items-center gap-3">
+      <div class="id-badge">ID</div>
+      <div>
+        <p class="eyebrow">Operations / ML-07</p>
+        <h1 class="font-display text-xl font-bold">Inspection Deck</h1>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs opacity-60 hidden sm:inline" id="last-run">Last run · never</span>
+      <button id="theme-toggle" class="icon-btn theme-text-btn" title="Toggle theme">Dark</button>
+      <label class="btn-primary">
+        <i class="ti ti-upload"></i> Upload CSV
+        <input type="file" id="file-input" accept=".csv" hidden>
+      </label>
+    </div>
+  </header>
+
+  <!-- CALIBRATION BANNER -->
+  <div class="banner rounded-lg px-4 py-3 mb-4 flex items-start justify-between gap-3">
+    <div class="flex items-start gap-2">
+      <i class="ti ti-alert-triangle mt-0.5"></i>
+      <p class="text-sm">
+        <strong>Calibration note.</strong> Based on validation testing,
+        <strong id="banner-rate">—</strong> of flagged machines are false alarms.
+        Use this ranking as a decision aid, not a replacement for inspection.
+      </p>
+    </div>
+    <button id="info-btn" class="icon-btn shrink-0" title="Model info"><i class="ti ti-info-circle"></i></button>
+  </div>
+
+  <!-- KPI CARDS -->
+  <section class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+    <div class="panel rounded-xl p-3">
+      <p class="stat-label">Scanned</p>
+      <p class="text-2xl font-semibold font-mono" id="kpi-scanned">0</p>
+      <p class="text-xs opacity-60 mt-1">machines</p>
+    </div>
+    <div class="panel rounded-xl p-3">
+      <p class="stat-label">Flagged</p>
+      <p class="text-2xl font-semibold font-mono c-amber" id="kpi-flagged">0</p>
+      <p class="text-xs opacity-60 mt-1">need review</p>
+    </div>
+    <div class="panel rounded-xl p-3">
+      <p class="stat-label">Critical</p>
+      <p class="text-2xl font-semibold font-mono c-red" id="kpi-critical">0</p>
+      <p class="text-xs opacity-60 mt-1">risk 80+</p>
+    </div>
+    <div class="panel rounded-xl p-3">
+      <p class="stat-label">Monitor</p>
+      <p class="text-2xl font-semibold font-mono c-amber" id="kpi-monitor">0</p>
+      <p class="text-xs opacity-60 mt-1">risk 50–79</p>
+    </div>
+    <div class="panel rounded-xl p-3">
+      <p class="stat-label">Healthy</p>
+      <p class="text-2xl font-semibold font-mono c-teal" id="kpi-healthy">0</p>
+      <p class="text-xs opacity-60 mt-1">risk &lt;50</p>
+    </div>
+  </section>
+
+  <!-- UPLOAD / EMPTY / PROCESSING ZONE -->
+  <section id="upload-zone" class="panel rounded-xl p-8 mb-4 text-center">
+    <div id="drop-area" class="drop-area rounded-xl p-8 cursor-pointer">
+      <i class="ti ti-cloud-upload text-3xl opacity-60"></i>
+      <p class="font-medium mt-2">No inspection data yet</p>
+      <p class="text-sm opacity-60 mt-1">Drag & drop a machine dataset here, or click to browse</p>
+      <p class="text-xs opacity-40 mt-3" id="required-cols-note"></p>
+    </div>
+  </section>
+
+  <section id="processing-zone" class="panel rounded-xl p-6 mb-4 hidden">
+    <p class="font-medium mb-1" id="processing-title">Analyzing Fleet</p>
+    <p class="text-xs opacity-60 mb-4" id="processing-file"></p>
+    <ul class="space-y-2 text-sm" id="processing-steps">
+      <li data-step="upload">Dataset uploaded</li>
+      <li data-step="validate">Data validation complete</li>
+      <li data-step="predict">Running predictive model</li>
+      <li data-step="risk">Calculating risk scores</li>
+      <li data-step="explain">Generating model explanations</li>
+    </ul>
+  </section>
+
+  <section id="upload-error" class="banner-error rounded-xl p-5 mb-4 hidden">
+    <p class="font-medium mb-1"><i class="ti ti-alert-circle"></i> Unable to analyze dataset</p>
+    <p class="text-sm mb-2">The following required columns are missing:</p>
+    <ul class="text-sm list-disc pl-5" id="missing-cols-list"></ul>
+    <p class="text-sm mt-2 opacity-70">Please upload a compatible CSV file.</p>
+  </section>
+
+  <!-- FLEET ANALYTICS -->
+  <section id="analytics-section" class="panel rounded-xl p-4 mb-4">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div class="flex items-center gap-3">
+        <div class="icon-box"><i class="ti ti-chart-bar"></i></div>
+        <div>
+          <p class="eyebrow">Fleet analytics</p>
+          <p class="font-display text-base font-semibold">Risk profile at a glance</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="view-dataset-btn" class="btn-ghost text-xs">View Dataset</button>
+        <button id="chart-toggle" class="btn-ghost text-xs">Hide charts −</button>
+      </div>
+    </div>
+
+    <div id="charts-row" class="grid md:grid-cols-2 gap-4">
+      <div>
+        <p class="text-sm font-medium">Risk distribution</p>
+        <p class="text-xs opacity-60 mb-2">Fleet health by priority band</p>
+        <div id="risk-empty" class="empty-note">No risk data available</div>
+        <div class="chart-wrap"><canvas id="risk-chart"></canvas></div>
+      </div>
+      <div>
+        <p class="text-sm font-medium">Predicted outcomes</p>
+        <p class="text-xs opacity-60 mb-2">Failure type distribution</p>
+        <div id="type-empty" class="empty-note">Awaiting prediction data</div>
+        <div class="chart-wrap"><canvas id="type-chart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIORITY QUEUE -->
+  <section class="panel rounded-xl p-4 mb-4">
+    <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
+      <div>
+        <p class="eyebrow">Priority queue</p>
+        <p class="font-display text-base font-semibold">Machines requiring attention</p>
+      </div>
+      <button id="download-btn" class="btn-ghost text-xs"><i class="ti ti-download"></i> Download ranking CSV</button>
+    </div>
+    <p class="text-xs opacity-60 mb-3" id="table-caption">No machines analyzed yet</p>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-2 mb-3 text-xs">
+      <select id="f-status" class="filter-select"><option value="all">Status: All</option><option value="critical">Critical</option><option value="monitor">Monitor</option><option value="healthy">Healthy</option></select>
+      <select id="f-type" class="filter-select"><option value="all">Failure type: All</option></select>
+      <select id="f-risk" class="filter-select"><option value="all">Risk: All</option><option value="80-100">80–100</option><option value="50-79">50–79</option><option value="0-49">0–49</option></select>
+      <select id="f-conf" class="filter-select"><option value="all">Confidence: All</option><option value="high">High (≥90%)</option><option value="medium">Medium (70–89%)</option><option value="low">Low (&lt;70%)</option></select>
+      <input id="f-search" type="text" placeholder="Search Machine ID…" class="filter-select flex-1 min-w-[140px]">
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 mb-3 text-xs">
+      <label class="opacity-70">Show top</label>
+      <select id="top-n-select" class="filter-select">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <input id="top-n-custom" type="number" min="1" class="filter-select w-20 hidden" placeholder="e.g. 15">
+      <span class="opacity-40">·</span>
+      <label class="opacity-70">Sort by</label>
+      <select id="sort-select" class="filter-select">
+        <option value="rank">Highest risk first</option>
+        <option value="confidence">Confidence</option>
+        <option value="id">Machine ID</option>
+        <option value="type">Failure type</option>
+      </select>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left opacity-60 text-xs">
+            <th class="pb-2 font-normal">Rank</th>
+            <th class="pb-2 font-normal">Machine ID</th>
+            <th class="pb-2 font-normal">Failure type</th>
+            <th class="pb-2 font-normal">Risk score</th>
+            <th class="pb-2 font-normal">Confidence</th>
+            <th class="pb-2 font-normal"></th>
+          </tr>
+        </thead>
+        <tbody id="ranked-body"></tbody>
+      </table>
+    </div>
+    <p class="text-xs opacity-50 mt-2">Select a row to inspect model drivers · SHAP values are relative contributions</p>
+  </section>
+
+</div>
+
+<!-- DETAIL SLIDE-OVER -->
+<div id="drawer-overlay" class="fixed inset-0 bg-black/50 hidden z-40"></div>
+<aside id="drawer" class="fixed top-0 right-0 h-full w-full sm:w-[420px] panel-solid p-6 translate-x-full transition-transform duration-200 z-50 overflow-y-auto">
+  <button id="drawer-close" class="icon-btn mb-4"><i class="ti ti-x"></i></button>
+  <p class="eyebrow">Model explanation</p>
+  <h3 class="font-display text-2xl font-bold" id="drawer-id">—</h3>
+  <p class="text-sm opacity-70 mb-4" id="drawer-summary">—</p>
+
+  <div class="panel rounded-lg p-4 mb-4">
+    <div class="flex justify-between text-sm mb-2">
+      <span>Prediction confidence</span>
+      <span class="font-mono font-semibold" id="drawer-conf-val">—</span>
+    </div>
+    <div class="progress-track"><div id="drawer-conf-bar" class="progress-fill" style="width:0%"></div></div>
+    <p class="text-xs mt-1 opacity-70" id="drawer-conf-label"></p>
+  </div>
+
+  <p class="text-xs font-medium mb-2 opacity-80">Top contributing readings</p>
+  <div id="drawer-features" class="mb-4"></div>
+  <button id="drawer-shap-expand" class="btn-ghost text-xs mb-4 hidden">View full model explanation</button>
+  <div id="drawer-shap-full" class="hidden mb-4"></div>
+
+  <div class="rec-box rounded-lg p-4 mb-4" id="drawer-recommendation">
+    <p class="text-xs font-medium mb-1" id="rec-title">Recommended action</p>
+    <p class="text-sm" id="rec-text">—</p>
+    <p class="text-xs opacity-60 mt-2">AI-assisted recommendation — not a replacement for professional inspection.</p>
+  </div>
+
+  <p class="text-xs font-medium mb-2 opacity-80">Sensor snapshot</p>
+  <div id="drawer-sensors" class="grid grid-cols-2 gap-2 mb-4"></div>
+
+  <p class="text-xs font-medium mb-2 opacity-80">Machine history</p>
+  <p class="text-xs opacity-60" id="drawer-history">Historical trend unavailable for this dataset.</p>
+</aside>
+
+<!-- DATASET PREVIEW MODAL -->
+<div id="dataset-modal-overlay" class="fixed inset-0 bg-black/50 hidden z-40"></div>
+<div id="dataset-modal" class="fixed inset-0 m-auto h-fit max-h-[80vh] w-[92%] max-w-2xl panel-solid rounded-xl p-5 hidden z-50 overflow-y-auto">
+  <div class="flex justify-between items-center mb-3">
+    <p class="font-display font-semibold">Dataset preview</p>
+    <button id="dataset-modal-close" class="icon-btn"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="grid grid-cols-4 gap-2 mb-4 text-center text-xs">
+    <div class="panel rounded-lg p-2"><p class="font-mono text-lg" id="ds-rows">—</p><p class="opacity-60">Rows</p></div>
+    <div class="panel rounded-lg p-2"><p class="font-mono text-lg" id="ds-cols">—</p><p class="opacity-60">Features</p></div>
+    <div class="panel rounded-lg p-2"><p class="font-mono text-lg" id="ds-missing">—</p><p class="opacity-60">Missing values</p></div>
+    <div class="panel rounded-lg p-2"><p class="font-mono text-lg" id="ds-machines">—</p><p class="opacity-60">Machines</p></div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="text-xs w-full" id="ds-table"></table>
+  </div>
+</div>
+
+<!-- MODEL INFO TOOLTIP MODAL -->
+<div id="info-modal-overlay" class="fixed inset-0 bg-black/50 hidden z-40"></div>
+<div id="info-modal" class="fixed inset-0 m-auto h-fit w-[92%] max-w-md panel-solid rounded-xl p-5 hidden z-50">
+  <div class="flex justify-between items-center mb-3">
+    <p class="font-display font-semibold">About this model</p>
+    <button id="info-modal-close" class="icon-btn"><i class="ti ti-x"></i></button>
+  </div>
+  <ul class="text-sm space-y-2 opacity-90">
+    <li><strong>False positive rate:</strong> <span id="info-fp-rate">—</span> (from validation testing)</li>
+    <li><strong>Model confidence:</strong> shown per-machine as Stage 2 classification confidence</li>
+    <li><strong>Limitations:</strong> trained on historical sensor patterns; unusual operating conditions may reduce accuracy</li>
+    <li><strong>Recommendation:</strong> treat flagged machines as priorities for physical inspection, not confirmed failures</li>
+  </ul>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

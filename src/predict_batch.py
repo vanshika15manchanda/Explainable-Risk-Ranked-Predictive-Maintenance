@@ -74,6 +74,77 @@ def encode_raw(df_raw: pd.DataFrame, feature_columns: list) -> pd.DataFrame:
     return df_encoded[feature_columns]
 
 
+# def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types):
+#     X_scaled = stage1_scaler.transform(X_raw)
+
+#     stage1_probs = stage1_model.predict_proba(X_scaled)[:, 1]
+#     stage1_preds = stage1_model.predict(X_scaled)
+
+#     flagged_idx = np.where(stage1_preds == 1)[0]
+
+#     result = X_raw.copy()
+#     result["stage1_failure_probability"] = stage1_probs
+#     result["stage1_flagged"] = stage1_preds
+
+#     if len(flagged_idx) == 0:
+#         result["predicted_failure_types"] = "n/a (not flagged)"
+#         result["stage2_confidence"] = np.nan
+#         result["shap_magnitude"] = np.nan
+#         result["priority_score"] = np.nan
+#         result["priority_rank"] = np.nan
+#         return result.sort_values("stage1_failure_probability", ascending=False)
+
+#     X_flagged_scaled = X_scaled[flagged_idx]
+
+#     stage2_preds = stage2_model.predict(X_flagged_scaled)
+#     stage2_probs_per_label = np.stack(
+#         [est.predict_proba(X_flagged_scaled)[:, 1] for est in stage2_model.estimators_], axis=1
+#     )
+#     stage2_confidence = stage2_probs_per_label.max(axis=1)
+
+#     stage1_explainer = shap.TreeExplainer(stage1_model)
+#     stage1_shap_magnitude = np.abs(stage1_explainer.shap_values(X_flagged_scaled)).sum(axis=1)
+
+#     stage2_shap_magnitude = np.zeros(len(flagged_idx))
+#     for est in stage2_model.estimators_:
+#         explainer = shap.TreeExplainer(est)
+#         sv = explainer.shap_values(X_flagged_scaled)
+#         sv = sv[1] if isinstance(sv, list) else sv
+#         stage2_shap_magnitude += np.abs(sv).sum(axis=1)
+
+#     combined_shap_magnitude = stage1_shap_magnitude + stage2_shap_magnitude
+
+#     predicted_types = [
+#         ", ".join([ft for ft, p in zip(failure_types, row) if p == 1]) or "none"
+#         for row in stage2_preds
+#     ]
+
+#     scaler = MinMaxScaler()
+#     normalized = scaler.fit_transform(
+#         np.column_stack([stage1_probs[flagged_idx], stage2_confidence, combined_shap_magnitude])
+#     )
+#     priority_scores = (
+#         W1_STAGE1_PROB * normalized[:, 0] + W2_STAGE2_CONF * normalized[:, 1] + W3_SHAP_MAGNITUDE * normalized[:, 2]
+#     )
+
+#     result["predicted_failure_types"] = "n/a (not flagged)"
+#     result["stage2_confidence"] = np.nan
+#     result["shap_magnitude"] = np.nan
+#     result["priority_score"] = np.nan
+
+#     result.iloc[flagged_idx, result.columns.get_loc("predicted_failure_types")] = predicted_types
+#     result.iloc[flagged_idx, result.columns.get_loc("stage2_confidence")] = stage2_confidence
+#     result.iloc[flagged_idx, result.columns.get_loc("shap_magnitude")] = combined_shap_magnitude
+#     result.iloc[flagged_idx, result.columns.get_loc("priority_score")] = priority_scores
+
+#     result = result.sort_values(["stage1_flagged", "priority_score"], ascending=[False, False])
+#     result["priority_rank"] = range(1, len(result) + 1)
+
+#     # Keep the ORIGINAL row position (not reset) so callers like main() can
+#     # still map extra columns (e.g. Machine ID) back by original row order
+#     return result
+
+
 def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types):
     X_scaled = stage1_scaler.transform(X_raw)
 
@@ -85,6 +156,7 @@ def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types)
     result = X_raw.copy()
     result["stage1_failure_probability"] = stage1_probs
     result["stage1_flagged"] = stage1_preds
+    result["top_features"] = [[] for _ in range(len(result))]
 
     if len(flagged_idx) == 0:
         result["predicted_failure_types"] = "n/a (not flagged)"
@@ -103,7 +175,8 @@ def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types)
     stage2_confidence = stage2_probs_per_label.max(axis=1)
 
     stage1_explainer = shap.TreeExplainer(stage1_model)
-    stage1_shap_magnitude = np.abs(stage1_explainer.shap_values(X_flagged_scaled)).sum(axis=1)
+    stage1_shap_values = stage1_explainer.shap_values(X_flagged_scaled)
+    stage1_shap_magnitude = np.abs(stage1_shap_values).sum(axis=1)
 
     stage2_shap_magnitude = np.zeros(len(flagged_idx))
     for est in stage2_model.estimators_:
@@ -119,6 +192,20 @@ def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types)
         for row in stage2_preds
     ]
 
+    # Per-feature SHAP breakdown (top 4 by magnitude) for each flagged machine.
+    # Uses Stage 1's signed SHAP values -- positive pushes toward failure, negative away.
+    # Display-only: does not change any model behavior.
+    top_features_list = []
+    for i, row_shap in enumerate(stage1_shap_values):
+        pairs = list(zip(X_raw.columns, row_shap))
+        pairs.sort(key=lambda p: abs(p[1]), reverse=True)
+        top4 = pairs[:4]
+        original_row = X_raw.iloc[flagged_idx[i]]
+        top_features_list.append([
+            {"feature": name, "value": round(float(original_row[name]), 2), "impact": round(float(val), 4)}
+            for name, val in top4
+        ])
+
     scaler = MinMaxScaler()
     normalized = scaler.fit_transform(
         np.column_stack([stage1_probs[flagged_idx], stage2_confidence, combined_shap_magnitude])
@@ -131,17 +218,18 @@ def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types)
     result["stage2_confidence"] = np.nan
     result["shap_magnitude"] = np.nan
     result["priority_score"] = np.nan
+    result["top_features"] = result["top_features"].astype(object)
 
     result.iloc[flagged_idx, result.columns.get_loc("predicted_failure_types")] = predicted_types
     result.iloc[flagged_idx, result.columns.get_loc("stage2_confidence")] = stage2_confidence
     result.iloc[flagged_idx, result.columns.get_loc("shap_magnitude")] = combined_shap_magnitude
     result.iloc[flagged_idx, result.columns.get_loc("priority_score")] = priority_scores
+    for i, idx in enumerate(flagged_idx):
+        result.iloc[idx, result.columns.get_loc("top_features")] = top_features_list[i]
 
     result = result.sort_values(["stage1_flagged", "priority_score"], ascending=[False, False])
     result["priority_rank"] = range(1, len(result) + 1)
 
-    # Keep the ORIGINAL row position (not reset) so callers like main() can
-    # still map extra columns (e.g. Machine ID) back by original row order
     return result
 
 
