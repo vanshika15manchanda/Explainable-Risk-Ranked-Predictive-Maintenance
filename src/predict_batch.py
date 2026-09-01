@@ -225,7 +225,7 @@ def score_batch(X_raw, stage1_model, stage1_scaler, stage2_model, failure_types)
     result.iloc[flagged_idx, result.columns.get_loc("shap_magnitude")] = combined_shap_magnitude
     result.iloc[flagged_idx, result.columns.get_loc("priority_score")] = priority_scores
     for i, idx in enumerate(flagged_idx):
-        result.iloc[idx, result.columns.get_loc("top_features")] = top_features_list[i]
+        result.iat[idx, result.columns.get_loc("top_features")] = top_features_list[i]
 
     result = result.sort_values(["stage1_flagged", "priority_score"], ascending=[False, False])
     result["priority_rank"] = range(1, len(result) + 1)
