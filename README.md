@@ -176,4 +176,4 @@ Check out the live web application here:https://docs.google.com/presentation/d/1
 
 ## Team
 
-Built by  — vanshika15manchanda, vijayajaiswal398, ishikasingh2906
+Built by  — @vanshika15manchanda, @vijayajaiswal398, @ishikasingh2906
