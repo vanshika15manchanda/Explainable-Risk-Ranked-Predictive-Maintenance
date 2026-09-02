@@ -170,8 +170,7 @@ The priority queue view shows every machine sorted by risk, with its predicted f
 <img width="1591" height="302" alt="image" src="https://github.com/user-attachments/assets/2e2ac7a2-d5b7-40ac-8adc-1ec0cda4a13b" />
 
 
-Check out the live web application here:https://docs.google.com/presentation/d/1GIkwUBTm_aT4GKF5ULRTLO8FJxJUbOdb/edit?usp=sharing&ouid=117704189816769727589&rtpof=true&sd=true
-
+Check out the live web application here:(https://explainable-risk-ranked-predictive-sgk3.onrender.com/)
 
 
 ## Team
