@@ -175,4 +175,4 @@ Check out the live web application here:(https://explainable-risk-ranked-predict
 
 ## Team
 
-Built by — [@vanshika15manchanda](https://github.com/vanshika15manchanda), [@vijayajaiswal398](https://github.com/vijayajaiswal398), [@ishikasingh2906](https://github.com/ishikasingh2906)
+Built by — [@vanshika15manchanda](https://github.com/vanshika15manchanda), [@vijayajaiswal398](https://github.com/vijayajaiswal398-commits), [@ishikasingh2906](https://github.com/ishikasingh2906)
